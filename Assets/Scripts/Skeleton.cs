@@ -3,6 +3,8 @@ using System.Collections;
 
 public class Skeleton : MonoBehaviour {
 
+	public bool increaseSpeed;
+
 	public float hp;
 	Animator anim;
 	Rigidbody rb2d;
@@ -17,9 +19,11 @@ public class Skeleton : MonoBehaviour {
 	public float attackTimer;
 	public float retreatTimer;
 	public float speed;
+	public float blend;
+	public float blendSmooth;
 	public float walkSpeed;
 	public float runSpeed;
-	public float runModifier = 1;
+	public bool running;
 	public float attackDistance;
 	public float runDistance;
 
@@ -39,12 +43,42 @@ public class Skeleton : MonoBehaviour {
 		if (dead) {
 			rb2d.velocity = new Vector3 (0, 0, 0);
 			rb2d.isKinematic = true;
-			gameObject.GetComponent<BoxCollider> ().enabled = false;
+			gameObject.GetComponent<CapsuleCollider> ().enabled = false;
 			this.enabled = false;
 		} else {
+			AdjustSpeed ();
 			AttackAndRetreatLoop ();
 		}
 
+	}
+
+	void AdjustSpeed () {
+		var deltaTime = Time.deltaTime / blendSmooth;
+		if (running) {
+			if (speed <= runSpeed) {
+				speed += deltaTime;
+				blend += deltaTime / 2;
+			} else {
+				speed = runSpeed;
+				blend = 1;
+			}
+		} else if (closingIn) {
+			if (speed <= walkSpeed) {
+				speed += deltaTime;
+				blend += deltaTime / 2;
+			} else {
+				speed = walkSpeed;
+				blend = 0.5f;
+			}
+		} else if (retreating) {
+			if (speed >= -walkSpeed) {
+				speed -= deltaTime;
+				blend -= deltaTime / 2;
+			} else {
+				speed = -walkSpeed;
+				blend = -0.5f;
+			}
+		}
 	}
 
 	void AttackAndRetreatLoop () {
@@ -58,19 +92,23 @@ public class Skeleton : MonoBehaviour {
 		if (closingIn) {
 			if (Mathf.Abs (transform.position.x - playerPos.x) < attackDistance){
 				closingIn = false;
+				running = false;
 				attackTimer = initAttackTimer;
 				retreatTimer = initRetreatTimer;
 				rb2d.velocity = new Vector3 (0, rb2d.velocity.y);
 				anim.SetTrigger ("Attack");
-				anim.SetFloat ("Blend", 0);
+				blend = 0;
+				speed = 0;
+				anim.SetFloat ("Blend", blend);
 				sword.attacking = true;
 			} else if (Mathf.Abs (transform.position.x - playerPos.x) < runDistance) {
-				anim.SetFloat ("Blend", 1);
-				speed = runSpeed;
+				anim.SetFloat ("Blend", blend);
+				running = true;
+				//speed = runSpeed;
 				rb2d.velocity = new Vector3 (speed * direction, rb2d.velocity.y);
 			} else {
-				anim.SetFloat ("Blend", 0.5f);
-				speed = walkSpeed;
+				anim.SetFloat ("Blend", blend);
+				//speed = walkSpeed;
 				rb2d.velocity = new Vector3 (speed * direction, rb2d.velocity.y);
 			}
 		} else if (attackTimer > 0) {
@@ -79,9 +117,9 @@ public class Skeleton : MonoBehaviour {
 			sword.attacking = false;
 			retreating = true;
 		} else if (retreating && retreatTimer > 0) {
-			anim.SetFloat ("Blend", -0.5f);
-			speed = walkSpeed;
-			rb2d.velocity = new Vector3 (speed * -direction, rb2d.velocity.y);
+			anim.SetFloat ("Blend", blend);
+			//speed = walkSpeed;
+			rb2d.velocity = new Vector3 (speed * direction, rb2d.velocity.y);
 			retreatTimer -= Time.deltaTime;
 		} else if (retreatTimer < 0) {
 			retreating = false;
